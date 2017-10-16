@@ -102,10 +102,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"log"
+	"math/rand"
 	"net/http"
-	"os"
+	"runtime"
+	"sync"
 	"time"
 )
 
@@ -113,7 +114,8 @@ import (
 //
 // All JSON-related structs were generated from the JSON examples
 // of the "SimpleJson" data source documentation
-// using [JSON-to-Go](https://mholt.github.io/json-to-go/).
+// using [JSON-to-Go](https://mholt.github.io/json-to-go/),
+// with a little tweaking afterwards.
 type Query struct {
 	PanelID int `json:"panelId"`
 	Range   struct {
@@ -139,12 +141,16 @@ type Query struct {
 	MaxDataPoints int    `json:"maxDataPoints"`
 }
 
+// Row is used in TimeseriesResponse and TableResponse.
+// Grafana's JSON contains weird arrays with mixed types!
+type Row []interface{}
+
 // TimeseriesResponse is the response to a `/query` request
 // if "Type" is set to "timeserie".
 // It sends time series data back to Grafana.
 type TimeseriesResponse struct {
-	Target     string      `json:"target"`
-	Datapoints [][]float64 `json:"datapoints"`
+	Target     string `json:"target"`
+	Datapoints []Row  `json:"datapoints"`
 }
 
 // TableResponse is the response to send when "Type" is "table".
@@ -152,14 +158,89 @@ type Column struct {
 	Text string `json:"text"`
 	Type string `json:"type"`
 }
-type Row []interface{}
 type TableResponse struct {
 	Columns []Column `json:"columns"`
 	Rows    []Row    `json:"rows"`
 	Type    string   `json:"type"`
 }
 
+// ## The data aggregator
+
+type GoroutinesCount struct {
+	N int
+	T time.Time
+}
+
+type GoroutinesStats struct {
+	m    sync.Mutex
+	List []GoroutinesCount
+	Head int
+}
+
+func NewGoroutinesStats(size int) *GoroutinesStats {
+	return &GoroutinesStats{
+		List: make([]GoroutinesCount, size, size),
+		Head: 0,
+	}
+}
+
+func (g *GoroutinesStats) Append(n int) {
+	g.m.Lock()
+	g.List[g.Head] = GoroutinesCount{n, time.Now()}
+	g.Head = (g.Head + 1) % len(g.List)
+	g.m.Unlock()
+}
+
+func (g *GoroutinesStats) StartCapturing() {
+	go func() {
+		for {
+			n := runtime.NumGoroutine()
+			g.Append(n)
+			time.Sleep(time.Duration(rand.Intn(10)) * time.Second / 2)
+		}
+	}()
+}
+
+func (g *GoroutinesStats) FetchStats() *[]Row {
+
+	g.m.Lock()
+	length := len(g.List)
+	gcnt := make([]GoroutinesCount, length, length)
+	head := g.Head
+	copy(gcnt, g.List)
+	g.m.Unlock()
+
+	rows := []Row{}
+	for i := 0; i < length; i++ {
+		count := gcnt[(i+head)%length] // wrap around
+		rows = append(rows, Row{count.N, count.T.UnixNano() / 1000000})
+	}
+	return &rows
+}
+
+// ## The data generator
+
+func spawnGoroutines() {
+	for {
+		// Spawn a few dozen goroutines in a burst.
+		for i := 0; i < rand.Intn(20)+20; i++ {
+			// Each goroutine shall live for a random time between
+			// 1 and 100 seconds.
+			go func(n int) {
+				time.Sleep(time.Duration(n) * time.Second)
+			}(rand.Intn(100))
+		}
+		// Wait for a few seconds between goroutine bursts.
+		// The more goroutines exist, the longer the wait.
+		time.Sleep(time.Duration(rand.Intn(10)+runtime.NumGoroutine()/10) * time.Second)
+	}
+}
+
 // ## The server
+
+type App struct {
+	Stats *GoroutinesStats
+}
 
 func writeError(w http.ResponseWriter, e error, m string) {
 	w.WriteHeader(http.StatusBadRequest)
@@ -167,16 +248,14 @@ func writeError(w http.ResponseWriter, e error, m string) {
 
 }
 
-func queryHandler(w http.ResponseWriter, r *http.Request) {
+func (app *App) queryHandler(w http.ResponseWriter, r *http.Request) {
 	var q bytes.Buffer
 
-	n, err := q.ReadFrom(r.Body)
+	_, err := q.ReadFrom(r.Body)
 	if err != nil {
 		writeError(w, err, "Cannot read request body")
 		return
 	}
-
-	log.Printf("Request body (%d bytes read): %s", n, string(q.Bytes()))
 
 	query := &Query{}
 	err = json.Unmarshal(q.Bytes(), query)
@@ -194,13 +273,13 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	// or a table response.
 	switch query.Targets[0].Type {
 	case "timeserie":
-		sendTimeseries(w, query)
+		app.sendTimeseries(w, query)
 	case "table":
-		sendTable(w, query)
+		app.sendTable(w, query)
 	}
 }
 
-func sendTimeseries(w http.ResponseWriter, q *Query) {
+func (app *App) sendTimeseries(w http.ResponseWriter, q *Query) {
 
 	log.Println("Sending time series data")
 
@@ -210,13 +289,8 @@ func sendTimeseries(w http.ResponseWriter, q *Query) {
 
 	response := []TimeseriesResponse{
 		{
-			Target: q.Targets[0].Target,
-			Datapoints: [][]float64{
-				[]float64{68.0, float64(int64(time.Now().UnixNano() / 1000000))},
-				[]float64{49.0, float64(int64(time.Now().UnixNano() / 1000000))},
-				[]float64{2.0, float64(int64(time.Now().UnixNano() / 1000000))},
-				[]float64{11.0, float64(int64(time.Now().UnixNano() / 1000000))},
-			},
+			Target:     q.Targets[0].Target,
+			Datapoints: *app.Stats.FetchStats(),
 		},
 	}
 
@@ -225,13 +299,11 @@ func sendTimeseries(w http.ResponseWriter, q *Query) {
 		writeError(w, err, "cannot marshal response")
 	}
 
-	log.Println("Response: ", string(jsonResp))
-
 	w.Write(jsonResp)
 
 }
 
-func sendTable(w http.ResponseWriter, q *Query) {
+func (app *App) sendTable(w http.ResponseWriter, q *Query) {
 
 	log.Println("Sending table data")
 
@@ -261,23 +333,27 @@ func sendTable(w http.ResponseWriter, q *Query) {
 		writeError(w, err, "cannot marshal response")
 	}
 
-	log.Println("Response: ", string(jsonResp))
-
 	w.Write(jsonResp)
 
 }
 
 func main() {
+
+	// Start spawning goroutines with random life span
+	go spawnGoroutines()
+
+	// Start collecting goroutine numbers
+	stats := NewGoroutinesStats(1000)
+	stats.StartCapturing()
+
+	app := &App{Stats: stats}
+
 	// Grafana expects a "200 OK" status for "/" when testing the connection.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Received: ", r.URL.Path)
-		log.Println("Request body: ")
-		io.Copy(os.Stderr, r.Body)
-
 		w.WriteHeader(http.StatusOK)
 	})
 
-	http.HandleFunc("/query", queryHandler)
+	http.HandleFunc("/query", app.queryHandler)
 
 	// Start the server.
 	log.Println("start grafanago")
