@@ -114,8 +114,8 @@ func newFakeDataFunc(max int, volatility float64) func() float64 {
 	return func() float64 {
 		rnd := 2 * (rand.Float64() - 0.5)
 		change := volatility * rnd
-		change += (0.5 - value) * 0.001
-		value += value * change
+		change += (0.5 - value) * 0.1
+		value += change
 		return value * float64(max)
 	}
 }
