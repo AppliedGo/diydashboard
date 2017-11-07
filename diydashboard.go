@@ -164,6 +164,20 @@ func main() {
 }
 
 /*
+
+## Two caveats
+
+There are two things to consider when using `grada`.
+
+First, when creating a metric, choose the longest time range that the dashboard might request. For example, if you plan to monitor data from the last 24 hours at most, choose this timeframe, even if most of the time, you set the dashboard to monitor only the last half an hour or so.
+
+The `Metric` type stores exactly the amount of data points that can occur for the given time range and the given data rate.
+
+For example, if your code delivers new data every 5 seconds, and if the maximum time range to monitor is 5 minutes, the most recent 60 data points are stored (5min * 60s/min / 5s).
+
+Second, all data points are stored in memory. Each data point is a `struct` containing a `float64` and a `time.Time` value. This struct consumes 32 bytes. There is no persistant storage behind a `Metric` object; so if you plan to monitor large time ranges and/or high-frequency data sources, verify if the required buffer still fits into main memory.
+
+
 ## How to get and run the code
 
 Step 1: `go get` the code. Note the `-d` flag that prevents auto-installing
