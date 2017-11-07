@@ -36,9 +36,9 @@ If your code creates some stats to monitor, Grafana and the Grada package may co
 
 Recently I had some time to play with Grafana ([GitHub page](https://github.com/grafana), [home page](https://grafana.com/grafana)), an open-source data dashboard for monitoring all kinds of [time series](https://en.wikipedia.org/wiki/Time_series) data.
 
-While Grafana comes with many prebuilt data sources for well-known metrics collector services and time series databases like Prometheus, InfluxDB, Elasticsearch, etc., I immediately thought of something different: what if I could feed a time series from my own code into a Grafana dashboard?
+While Grafana comes with many prebuilt data sources for well-known metrics collector services and time series databases, I immediately thought of something different: what if I could feed a time series from my own code into a Grafana dashboard?
 
-Turned out that there is an easy way to do that, with the help of a generic backend datasource named "SimpleJson". This datasource first sends a JSON query to a given URL, in order to retrieve the available metrics from that server. After connecting a dashboard panel to a metric, Grafana starts querying the server periodically for metrics data.
+Turned out that there is an easy way to do that, with the help of a generic backend datasource named "SimpleJson". This datasource first sends a JSON query to a given URL, in order to retrieve the available metrics from that server. After connecting a dashboard panel to a metric, Grafana can query the server periodically for metrics data.
 
 To easily connect any Go code to a Grafana dashboard panel, I wrote the package [grada](https://github.com/christophberger/grada) (from GRAfana DAshboard) that collects simple time series data and makes this data available to a Grafana instance via an HTTP server running in the background.
 
@@ -375,7 +375,7 @@ A dashboard can contain many panels, so you will want to give each panel a name.
 
 If you want, you can have the panel show more than one metric. Our app generates two metrics, so let's add "CPU2" to our panel.
 
-![CPU2 Selected](Grafana13_AddMetricCPU2.png)
+![CPU2 Selected](Grafana14_AddMetricCPU2.png)
 
 Click the close button in the top right corner to exit edit mode. If everything went fine, you should now see this:
 
