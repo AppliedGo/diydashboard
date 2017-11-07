@@ -30,7 +30,7 @@ tags = ["dashboard", "time series", "grafana"]
 categories = ["Tools And Libraries"]
 +++
 
-If your code creates some stats to monitor, then Grafana and the Grada package may come handy.
+If your code creates some stats to monitor, Grafana and the Grada package may come in handy.
 
 <!--more-->
 
