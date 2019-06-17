@@ -25,9 +25,9 @@ author = "Christoph Berger"
 email = "chris@appliedgo.net"
 date = "2017-10-30"
 draft = "false"
-domains = ["DevOps"]
+categories = ["DevOps"]
 tags = ["dashboard", "time series", "grafana"]
-categories = ["Tools And Libraries"]
+articletypes = ["Tools And Libraries"]
 +++
 
 If your code creates some stats to monitor, Grafana and the Grada package may come in handy.
