@@ -1,0 +1,6 @@
+github.com/christophberger/grada v0.0.0-20171107123403-5b073dc6bb99 h1:Mcp3V/dDWk4dThvhOJO2ZY24RUrT6s+RhTWPKCREIKE=
+github.com/christophberger/grada v0.0.0-20171107123403-5b073dc6bb99/go.mod h1:VbAKFoMcUWXoMMyJC8LxuWY95ciD5ZTlvVWbELti3R4=
+github.com/google/go-cmp v0.5.6 h1:BKbKCqvP6I+rmFHt06ZmyQtvB8xAkWdhFyr0ZUNZcxQ=
+github.com/google/go-cmp v0.5.6/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
